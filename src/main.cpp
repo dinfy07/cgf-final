@@ -1,4 +1,8 @@
+#define GLAD_GL_IMPLEMENTATION
 #include <glad/gl.h>
+#undef GLAD_GL_IMPLEMENTATION
+
+#include "renderer.hpp"
 #include <GLFW/glfw3.h>
 #include <algorithm>
 #include <iostream>
@@ -34,6 +38,7 @@ int main() {
     std::cout << "OpenGL: " << glGetString(GL_VERSION)
               << "\nRenderer: " << glGetString(GL_RENDERER) << '\n';
     {
+      Renderer renderer(SOLAR_SOURCE_DIR);
       while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -44,9 +49,7 @@ int main() {
           glfwWaitEventsTimeout(.1);
           continue;
         }
-        glViewport(0, 0, fw, fh);
-        glClearColor(.006f, .009f, .018f, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
+        renderer.draw(fw, fh);
         glfwSwapBuffers(window);
       }
     }
