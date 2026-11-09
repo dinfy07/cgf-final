@@ -34,7 +34,7 @@ target_include_directories(platform INTERFACE include)
 target_compile_definitions(platform INTERFACE GLFW_INCLUDE_NONE GL_SILENCE_DEPRECATION)
 target_link_libraries(platform INTERFACE glfw OpenGL::GL glm::glm)
 
-add_executable(solar_explorer src/main.cpp src/renderer.cpp)
+add_executable(solar_explorer src/main.cpp src/renderer.cpp src/mesh.cpp)
 target_include_directories(solar_explorer PRIVATE third_party)
 target_link_libraries(solar_explorer PRIVATE platform)
 

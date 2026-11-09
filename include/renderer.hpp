@@ -2,8 +2,11 @@
 #include "shader.hpp"
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
+#include "mesh.hpp"
+
 class Renderer {
   Shader bodyShader;
+  Mesh sphere;
 public:
   explicit Renderer(const std::string &root);
   void draw(int width, int height);
