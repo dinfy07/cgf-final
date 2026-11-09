@@ -2,6 +2,7 @@
 #include <cmath>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
 const std::array<Body, 9> Scene::bodies{
     {{"Mercury", "mercury", "A rocky inner world", .38f, 5.0f, 88.f, 58.6f,
       .03f, .3f},
@@ -20,19 +21,23 @@ const std::array<Body, 9> Scene::bodies{
       28.3f, 4.7f},
      {"Moon", "moon", "Earth is the parent of this orbital frame", .20f, 2.05f,
       27.3f, 27.3f, 6.7f, 0.f}}};
+
 glm::mat4 Scene::frame(int i) const {
   const auto &b = bodies.at(i);
   float angle =
       float(std::fmod(days / b.period, 1.) * glm::two_pi<double>()) + b.phase;
   auto orbit = glm::rotate(glm::mat4(1), angle, glm::vec3(0, 1, 0));
   auto local = orbit * glm::translate(glm::mat4(1), glm::vec3(b.orbit, 0, 0));
+
   // A translation-only Earth anchor prevents Earth's spin/scale from affecting
   // the Moon.
   return i == 8 ? glm::translate(glm::mat4(1), position(2)) * local : local;
 }
+
 glm::vec3 Scene::position(int i) const {
   return glm::vec3(frame(i) * glm::vec4(0, 0, 0, 1));
 }
+
 glm::mat4 Scene::model(int i) const {
   const auto &b = bodies.at(i);
   auto m = glm::translate(glm::mat4(1), position(i));

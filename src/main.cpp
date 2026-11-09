@@ -6,8 +6,10 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
+
 #include "renderer.hpp"
 #include "scene.hpp"
+
 int main() {
   int width = 1280, height = 720;
   try {
@@ -40,6 +42,7 @@ int main() {
       throw std::runtime_error("Cannot load OpenGL");
     std::cout << "OpenGL: " << glGetString(GL_VERSION)
               << "\nRenderer: " << glGetString(GL_RENDERER) << '\n';
+
     Scene scene;
     double last = glfwGetTime();
     {

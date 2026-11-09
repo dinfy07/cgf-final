@@ -2,9 +2,11 @@
 #include <cstddef>
 #include <glm/gtc/constants.hpp>
 #include <stdexcept>
+
 Geometry sphereGeometry(int longitude, int latitude) {
   if (longitude < 3 || latitude < 2)
     throw std::invalid_argument("Sphere resolution too small");
+
   Geometry g;
   for (int y = 0; y <= latitude; ++y)
     for (int x = 0; x <= longitude; ++x) {
@@ -13,6 +15,7 @@ Geometry sphereGeometry(int longitude, int latitude) {
       glm::vec3 n{sin(t) * cos(p), cos(t), sin(t) * sin(p)};
       g.vertices.push_back({n, n, {u, 1 - v}});
     }
+
   for (int y = 0; y < latitude; ++y)
     for (int x = 0; x < longitude; ++x) {
       unsigned a = y * (longitude + 1) + x, b = a + longitude + 1;
@@ -21,8 +24,10 @@ Geometry sphereGeometry(int longitude, int latitude) {
       if (y != latitude - 1)
         g.indices.insert(g.indices.end(), {a + 1, b + 1, b});
     }
+
   return g;
 }
+
 Mesh::Mesh(const Geometry &g) : count(GLsizei(g.indices.size())) {
   glGenVertexArrays(1, &vao);
   glGenBuffers(1, &vbo);
@@ -46,10 +51,12 @@ Mesh::Mesh(const Geometry &g) : count(GLsizei(g.indices.size())) {
                         (void *)offsetof(Vertex, uv));
   glBindVertexArray(0);
 }
+
 void Mesh::draw(GLenum mode) const {
   glBindVertexArray(vao);
-    glDrawElements(mode, count, GL_UNSIGNED_INT, nullptr);
+  glDrawElements(mode, count, GL_UNSIGNED_INT, nullptr);
 }
+
 Mesh::~Mesh() {
   glDeleteBuffers(1, &ebo);
   glDeleteBuffers(1, &vbo);
