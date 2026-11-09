@@ -1,12 +1,15 @@
 #define GLAD_GL_IMPLEMENTATION
 #include <glad/gl.h>
 #undef GLAD_GL_IMPLEMENTATION
-
-#include "renderer.hpp"
+#include <glad/gl.h>
 #include <GLFW/glfw3.h>
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
+
+#include "renderer.hpp"
+#include "scene.hpp"
+
 int main() {
   int width = 1280, height = 720;
   try {
@@ -26,6 +29,8 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_FALSE);
+    // One framebuffer pixel per window point makes 1280x720 benchmarks
+    // unambiguous on Retina.
     glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
     auto *window = glfwCreateWindow(width, height, "Solar System Explorer",
                                     nullptr, nullptr);
@@ -37,19 +42,23 @@ int main() {
       throw std::runtime_error("Cannot load OpenGL");
     std::cout << "OpenGL: " << glGetString(GL_VERSION)
               << "\nRenderer: " << glGetString(GL_RENDERER) << '\n';
+
+    Scene scene;
+    double last = glfwGetTime();
     {
       Renderer renderer(SOLAR_SOURCE_DIR);
       while (!glfwWindowShouldClose(window)) {
+        double now = glfwGetTime(), rawDt = now - last;
+        last = now;
         glfwPollEvents();
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-          glfwSetWindowShouldClose(window, true);
+        scene.advance(rawDt);
         int fw, fh;
         glfwGetFramebufferSize(window, &fw, &fh);
         if (fw == 0 || fh == 0) {
           glfwWaitEventsTimeout(.1);
           continue;
         }
-        renderer.draw(fw, fh);
+        renderer.draw(scene, fw, fh);
         glfwSwapBuffers(window);
       }
     }
