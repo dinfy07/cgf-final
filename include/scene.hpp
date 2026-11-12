@@ -12,6 +12,9 @@ public:
   double days = 23;
   float speed = 12.f;
   bool paused = false;
+  bool headlight = false, night = true;
+  float lightPower = 3.f;
+  int selected = -1;
   void advance(double dt) {
     if (!paused)
       days += dt * speed;
@@ -19,5 +22,6 @@ public:
   glm::mat4 frame(int index) const;
   glm::mat4 model(int index) const;
   glm::vec3 position(int index) const;
+  float focusDistance(int index) const;
   void reset() { *this = Scene(); }
 };
