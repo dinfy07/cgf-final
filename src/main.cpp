@@ -9,6 +9,7 @@
 
 #include "renderer.hpp"
 #include "scene.hpp"
+#include "camera.hpp"
 
 int main() {
   int width = 1280, height = 720;
@@ -27,10 +28,9 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 #endif
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4); 
     glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_FALSE);
-    // One framebuffer pixel per window point makes 1280x720 benchmarks
-    // unambiguous on Retina.
     glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
     auto *window = glfwCreateWindow(width, height, "Solar System Explorer",
                                     nullptr, nullptr);
@@ -43,7 +43,11 @@ int main() {
     std::cout << "OpenGL: " << glGetString(GL_VERSION)
               << "\nRenderer: " << glGetString(GL_RENDERER) << '\n';
 
+    glEnable(GL_MULTISAMPLE);              
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS); 
+
     Scene scene;
+    Camera camera;
     double last = glfwGetTime();
     {
       Renderer renderer(SOLAR_SOURCE_DIR);
@@ -58,7 +62,7 @@ int main() {
           glfwWaitEventsTimeout(.1);
           continue;
         }
-        renderer.draw(scene, fw, fh);
+        renderer.draw(scene, camera, fw, fh);
         glfwSwapBuffers(window);
       }
     }
