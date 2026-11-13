@@ -7,7 +7,7 @@ out vec4 color;
 
 uniform sampler2D dayTexture, nightTexture;
 uniform vec3 cameraPosition, tint;
-uniform bool earth, nightBlend, emissive, headlight, textured;
+uniform bool earth, nightBlend, emissive, headlight, textured, ring;
 uniform float lightPower;
 
 vec3 lightTerm(vec3 N, vec3 L, vec3 V, vec3 albedo, vec3 radiance) {
@@ -45,5 +45,12 @@ void main() {
         result += lightTerm(N, V, V, albedo, radiance);
     }
 
-    color = vec4(pow(max(result, vec3(0.0)), vec3(1.0 / 2.2)), 1.0);
+    float alpha = 1.0;
+    if (ring) {
+        float bands = 0.54 + 0.22 * sin(uv.x * 170.0) + 0.12 * sin(uv.x * 47.0);
+        float gap = 1.0 - 0.93 * exp(-pow((uv.x - 0.48) / 0.025, 2.0));
+        alpha = clamp(bands * gap, 0.04, 0.82);
+        result = tint * (0.28 + 0.65 * abs(dot(N, L)));
+    }
+    color = vec4(pow(max(result, vec3(0.0)), vec3(1.0 / 2.2)), alpha);
 }

@@ -11,8 +11,9 @@ struct Geometry {
   std::vector<unsigned> indices;
 };
 Geometry sphereGeometry(int longitude = 64, int latitude = 32);
+Geometry ringGeometry(int segments = 256);
 class Mesh {
-  GLuint vao = 0, vbo = 0, ebo = 0;
+  GLuint vao = 0, vbo = 0, ebo = 0, instances = 0;
   GLsizei count = 0;
 
 public:
@@ -20,5 +21,6 @@ public:
   ~Mesh();
   Mesh(const Mesh &) = delete;
   Mesh &operator=(const Mesh &) = delete;
-  void draw(GLenum mode = GL_TRIANGLES) const;
+  void setInstances(const std::vector<glm::mat4> &transforms);
+  void draw(GLenum mode = GL_TRIANGLES, int instanceCount = 0) const;
 };

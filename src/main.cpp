@@ -50,8 +50,16 @@ static void key(GLFWwindow *w, int k, int, int action, int) {
     s.headlight = !s.headlight;
   if (k == GLFW_KEY_N)
     s.night = !s.night;
+  if (k == GLFW_KEY_G)
+    s.rings = !s.rings;
+  if (k == GLFW_KEY_B)
+    s.asteroids = !s.asteroids;
+  if (k == GLFW_KEY_O)
+    s.orbits = !s.orbits;
   if (k == GLFW_KEY_F)
     a.camera.free = !a.camera.free;
+  if (k == GLFW_KEY_V)
+    s.wireframe = !s.wireframe;
   if (k == GLFW_KEY_R) {
     s.reset();
     a.camera = Camera();

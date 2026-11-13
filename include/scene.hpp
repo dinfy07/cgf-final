@@ -13,6 +13,7 @@ public:
   float speed = 12.f;
   bool paused = false;
   bool headlight = false, night = true;
+  bool rings = true, asteroids = true, orbits = true, wireframe = false;
   float lightPower = 3.f;
   int selected = -1;
   void advance(double dt) {
