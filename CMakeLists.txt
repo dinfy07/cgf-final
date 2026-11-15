@@ -33,9 +33,21 @@ add_library(platform INTERFACE)
 target_include_directories(platform INTERFACE include)
 target_compile_definitions(platform INTERFACE GLFW_INCLUDE_NONE GL_SILENCE_DEPRECATION)
 target_link_libraries(platform INTERFACE glfw OpenGL::GL glm::glm)
-add_executable(solar_explorer src/main.cpp src/renderer.cpp src/mesh.cpp src/scene.cpp src/texture.cpp)
+
+set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui)
+add_library(imgui_lib STATIC
+  ${IMGUI_DIR}/imgui.cpp
+  ${IMGUI_DIR}/imgui_draw.cpp
+  ${IMGUI_DIR}/imgui_tables.cpp
+  ${IMGUI_DIR}/imgui_widgets.cpp
+  ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+  ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp)
+target_include_directories(imgui_lib PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+target_link_libraries(imgui_lib PUBLIC platform)
+
+add_executable(solar_explorer src/main.cpp src/renderer.cpp src/mesh.cpp src/scene.cpp src/texture.cpp src/ui.cpp)
 target_include_directories(solar_explorer PRIVATE third_party)
-target_link_libraries(solar_explorer PRIVATE platform)
+target_link_libraries(solar_explorer PRIVATE platform imgui_lib)
 if(MSVC)
   target_compile_options(solar_explorer PRIVATE /W4)
 else()

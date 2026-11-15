@@ -14,6 +14,7 @@ public:
   bool paused = false;
   bool headlight = false, night = true;
   bool rings = true, asteroids = true, orbits = true, wireframe = false;
+  bool labels = true;
   float lightPower = 3.f;
   int selected = -1;
   void advance(double dt) {
