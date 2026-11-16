@@ -4,9 +4,16 @@
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 #include <algorithm>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
+
+namespace fs = std::filesystem;
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -84,9 +91,113 @@ static void scroll(GLFWwindow *w, double, double y) {
     state(w)->camera.zoom(float(y));
 }
 
-int main() {
+static void screenshot(const fs::path &path, int w, int h) {
+  std::vector<unsigned char> pixels(size_t(w) * h * 3);
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
+  glReadBuffer(GL_BACK);
+  glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+  std::ofstream out(path, std::ios::binary);
+  out << "P6\n" << w << " " << h << "\n255\n";
+  for (int y = h - 1; y >= 0; --y)
+    out.write(reinterpret_cast<char *>(pixels.data() + size_t(y) * w * 3),
+              w * 3);
+  if (!out)
+    throw std::runtime_error("Failed to save screenshot: " + path.string());
+}
+
+static void tour(App &a, double t) {
+  auto &s = a.scene;
+  auto &c = a.camera;
+  int step = int(t / 20);
+  s.selected = -1;
+  s.speed = 2;
+  s.night = true;
+  s.rings = true;
+  s.asteroids = true;
+  s.headlight = false;
+  s.paused = false;
+  c.free = false;
+  const char *captions[] = {
+      "R1 / R2 / R3 - C++ and OpenGL core. Eight textured planets, a star, a moon and a parent-child orbit hierarchy.",
+      "R5 - Equirectangular planet maps with UV coordinates, trilinear mipmapping and a six-face star cubemap.",
+      "Stretch 1 - Earth blends day and city-light textures using the signed dot product of its normal and sunlight direction.",
+      "R4 - Per-fragment Blinn-Phong shading. The Sun lights the day side. The switchable camera light is the second source.",
+      "Stretch 2 - Saturn has transparent, banded rings. Opaque objects write depth before alpha blending the ring.",
+      "Stretch 3 - 2,200 asteroids share one mesh and one instanced draw call. Static instance matrices upload once.",
+      "R6 - Travel to any planet with keys 1-8. Mouse and arrow keys orbit. Scroll changes distance. F enables free flight.",
+      "R6 - Pause, resume and change time speed. Orbital motion uses elapsed seconds, independently of frame rate.",
+      "R3 - Follow the Moon. Its world transform is composed from Earth's translation and its own local orbit.",
+      "R7 / R8 - The live FPS counter stays visible. README documents the CMake build. Stylized scale, not an ephemeris."};
+  a.ui.caption = captions[std::min(step, 9)];
+  if (step == 1)
+    s.selected = 4;
+  if (step == 2 || step == 3) {
+    s.selected = 2;
+    s.speed = .12f;
+    if (step == 3)
+      s.headlight = int(t / 5) % 2 == 0;
+  }
+  if (step == 4)
+    s.selected = 5;
+  if (step == 5) {
+    s.selected = -1;
+    c.distance = 38;
+  }
+  if (step == 6)
+    s.selected = std::min(7, int(t - 120) / 3);
+  if (step == 7) {
+    s.selected = 2;
+    s.speed = 12;
+    s.paused = int(t / 5) % 2 == 0;
+  }
+  if (step == 8)
+    s.selected = 8;
+  if (step == 9)
+    s.selected = 2;
+  if (step != 5)
+    c.distance = s.focusDistance(s.selected);
+  c.yaw += .045f / 60.f;
+}
+
+int main(int argc, char **argv) {
   int width = 1280, height = 720;
+  double seconds = 0;
+  bool touring = false, hidden = false, vsync = true;
+  std::string capture, stats, root = SOLAR_SOURCE_DIR;
   try {
+    for (int i = 1; i < argc; ++i) {
+      std::string arg = argv[i];
+      auto value = [&]() {
+        if (++i >= argc)
+          throw std::runtime_error("Missing value for " + arg);
+        return std::string(argv[i]);
+      };
+      if (arg == "--width")
+        width = std::stoi(value());
+      else if (arg == "--height")
+        height = std::stoi(value());
+      else if (arg == "--seconds")
+        seconds = std::stod(value());
+      else if (arg == "--capture")
+        capture = value();
+      else if (arg == "--stats")
+        stats = value();
+      else if (arg == "--assets-root")
+        root = value();
+      else if (arg == "--tour")
+        touring = true;
+      else if (arg == "--hidden")
+        hidden = true;
+      else if (arg == "--no-vsync")
+        vsync = false;
+      else if (arg == "--help") {
+        std::cout << "solar_explorer [--tour] [--seconds N] [--width W --height H] [--capture DIR] [--stats FILE] [--assets-root DIR] [--no-vsync] [--hidden]\n";
+        return 0;
+      } else
+        throw std::runtime_error("Unknown option: " + arg);
+    }
+    if (width < 640 || height < 480 || seconds < 0)
+      throw std::runtime_error("Invalid dimensions or duration");
     glfwSetErrorCallback([](int e, const char *m) {
       std::cerr << "GLFW " << e << ": " << m << '\n';
     });
@@ -102,7 +213,7 @@ int main() {
 #endif
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SAMPLES, 4);
-    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_VISIBLE, hidden ? GLFW_FALSE : GLFW_TRUE);
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_FALSE);
     // One framebuffer pixel per window point makes 1280x720 benchmarks
     // unambiguous on Retina.
@@ -112,7 +223,7 @@ int main() {
     if (!window)
       throw std::runtime_error("Cannot create OpenGL window");
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);
+    glfwSwapInterval(vsync ? 1 : 0);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress))
       throw std::runtime_error("Cannot load OpenGL");
     std::cout << "OpenGL: " << glGetString(GL_VERSION)
@@ -135,19 +246,31 @@ int main() {
     glEnable(GL_MULTISAMPLE);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
-    unsigned frames = 0;
+    if (!capture.empty())
+      fs::create_directories(capture);
+    std::ofstream samples;
+    if (!stats.empty()) {
+      samples.open(stats);
+      samples << "elapsed_seconds,frame_ms,width,height,view\n";
+    }
+    unsigned frames = 0, errors = 0;
     double begin = glfwGetTime(), last = begin, stamp = begin;
+    int lastShot = -1;
     float fps = 60;
     {
-      Renderer renderer(SOLAR_SOURCE_DIR);
+      Renderer renderer(root);
       while (!glfwWindowShouldClose(window)) {
-        double now = glfwGetTime(), rawDt = now - last;
+        double now = glfwGetTime(), elapsed = now - begin, rawDt = now - last;
         last = now;
+        if (seconds > 0 && elapsed >= seconds)
+          break;
         float dt = float(std::min(rawDt, .10));
         glfwPollEvents();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+        if (touring)
+          tour(app, elapsed);
         double x, y;
         glfwGetCursorPos(window, &x, &y);
         bool drag =
@@ -189,6 +312,22 @@ int main() {
         app.ui.draw(app.scene, app.camera, ww, wh, fps);
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (!capture.empty()) {
+          int shot = int(elapsed / 20);
+          if (elapsed - shot * 20 >= 8 && shot != lastShot) {
+            screenshot(fs::path(capture) / ("view_" + std::to_string(shot) + ".ppm"), fw, fh);
+            lastShot = shot;
+          }
+        }
+        GLenum error;
+        while ((error = glGetError()) != GL_NO_ERROR) {
+          ++errors;
+          std::cerr << "GL error: " << error << '\n';
+        }
+        if (samples && elapsed > 2)
+          samples << std::fixed << std::setprecision(5) << elapsed << ','
+                  << rawDt * 1000 << ',' << fw << ',' << fh << ','
+                  << app.scene.selected << '\n';
         glfwSwapBuffers(window);
         ++frames;
         if (now - stamp >= .5) {
@@ -201,12 +340,13 @@ int main() {
         }
       }
     }
+    std::cout << "OpenGL errors: " << errors << '\n';
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     glfwDestroyWindow(window);
     glfwTerminate();
-    return 0;
+    return errors ? 2 : 0;
   } catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << '\n';
     glfwTerminate();

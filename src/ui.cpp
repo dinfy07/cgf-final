@@ -128,4 +128,14 @@ void UI::draw(Scene &s, Camera &c, int w, int h, float fps) {
                     Scene::bodies[i].name);
     }
   }
+  if (!caption.empty()) {
+    ImGui::SetNextWindowPos({panelWidth + 40, 72});
+    ImGui::SetNextWindowSize({float(w) - panelWidth - 80, 86});
+    ImGui::SetNextWindowBgAlpha(.9f);
+    ImGui::Begin("Demonstration captions", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs);
+    ImGui::TextColored(accent, "PROJECT WALKTHROUGH");
+    ImGui::TextWrapped("%s", caption.c_str());
+    ImGui::End();
+  }
 }
