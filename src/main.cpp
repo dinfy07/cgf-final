@@ -6,9 +6,83 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <string>
+
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 
 #include "renderer.hpp"
 #include "scene.hpp"
+#include "camera.hpp"
+#include "ui.hpp"
+
+struct App {
+  Scene scene;
+  Camera camera;
+  UI ui;
+  double mx = 0, my = 0;
+  bool dragging = false;
+};
+
+static App *state(GLFWwindow *w) {
+  return static_cast<App *>(glfwGetWindowUserPointer(w));
+}
+
+static void key(GLFWwindow *w, int k, int, int action, int) {
+  if (action != GLFW_PRESS || ImGui::GetIO().WantCaptureKeyboard)
+    return;
+  auto &a = *state(w);
+  auto &s = a.scene;
+  if (k == GLFW_KEY_ESCAPE)
+    glfwSetWindowShouldClose(w, true);
+  if (k >= GLFW_KEY_1 && k <= GLFW_KEY_9) {
+    s.selected = k - GLFW_KEY_1;
+    a.camera.free = false;
+    a.camera.distance = s.focusDistance(s.selected);
+  }
+  if (k == GLFW_KEY_M) {
+    s.selected = 8;
+    a.camera.free = false;
+    a.camera.distance = s.focusDistance(8);
+  }
+  if (k == GLFW_KEY_0) {
+    s.selected = -1;
+    a.camera.free = false;
+    a.camera.distance = 70;
+  }
+  if (k == GLFW_KEY_SPACE)
+    s.paused = !s.paused;
+  if (k == GLFW_KEY_L)
+    s.headlight = !s.headlight;
+  if (k == GLFW_KEY_N)
+    s.night = !s.night;
+  if (k == GLFW_KEY_G)
+    s.rings = !s.rings;
+  if (k == GLFW_KEY_B)
+    s.asteroids = !s.asteroids;
+  if (k == GLFW_KEY_O)
+    s.orbits = !s.orbits;
+  if (k == GLFW_KEY_F)
+    a.camera.free = !a.camera.free;
+  if (k == GLFW_KEY_H)
+    a.ui.visible = !a.ui.visible;
+  if (k == GLFW_KEY_V)
+    s.wireframe = !s.wireframe;
+  if (k == GLFW_KEY_R) {
+    s.reset();
+    a.camera = Camera();
+  }
+  if (k == GLFW_KEY_EQUAL || k == GLFW_KEY_KP_ADD)
+    s.speed = std::min(120.f, s.speed + 3);
+  if (k == GLFW_KEY_MINUS || k == GLFW_KEY_KP_SUBTRACT)
+    s.speed = std::max(0.f, s.speed - 3);
+}
+
+static void scroll(GLFWwindow *w, double, double y) {
+  if (!ImGui::GetIO().WantCaptureMouse)
+    state(w)->camera.zoom(float(y));
+}
 
 int main() {
   int width = 1280, height = 720;
@@ -27,6 +101,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 #endif
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
     glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_FALSE);
     // One framebuffer pixel per window point makes 1280x720 benchmarks
@@ -43,25 +118,92 @@ int main() {
     std::cout << "OpenGL: " << glGetString(GL_VERSION)
               << "\nRenderer: " << glGetString(GL_RENDERER) << '\n';
 
-    Scene scene;
-    double last = glfwGetTime();
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    ImGui::GetIO().IniFilename = nullptr;
+    ImGui::GetIO().FontGlobalScale = 1.f;
+    UI::style();
+
+    App app;
+    glfwSetWindowUserPointer(window, &app);
+    glfwSetKeyCallback(window, key);
+    glfwSetScrollCallback(window, scroll);
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330 core");
+
+    glEnable(GL_MULTISAMPLE);
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+    unsigned frames = 0;
+    double begin = glfwGetTime(), last = begin, stamp = begin;
+    float fps = 60;
     {
       Renderer renderer(SOLAR_SOURCE_DIR);
       while (!glfwWindowShouldClose(window)) {
         double now = glfwGetTime(), rawDt = now - last;
         last = now;
+        float dt = float(std::min(rawDt, .10));
         glfwPollEvents();
-        scene.advance(rawDt);
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        double x, y;
+        glfwGetCursorPos(window, &x, &y);
+        bool drag =
+            glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS &&
+            !ImGui::GetIO().WantCaptureMouse;
+        if (drag && app.dragging)
+          app.camera.rotate(float(x - app.mx), float(y - app.my));
+        app.mx = x;
+        app.my = y;
+        app.dragging = drag;
+        auto down = [&](int k) {
+          return glfwGetKey(window, k) == GLFW_PRESS ? 1.f : 0.f;
+        };
+        if (!ImGui::GetIO().WantCaptureKeyboard) {
+          app.camera.yaw += (down(GLFW_KEY_LEFT) - down(GLFW_KEY_RIGHT)) * dt;
+          app.camera.pitch = std::clamp(
+              app.camera.pitch + (down(GLFW_KEY_UP) - down(GLFW_KEY_DOWN)) * dt,
+              -1.45f, 1.45f);
+          if (app.camera.free)
+            app.camera.move(down(GLFW_KEY_W) - down(GLFW_KEY_S),
+                            down(GLFW_KEY_D) - down(GLFW_KEY_A),
+                            down(GLFW_KEY_E) - down(GLFW_KEY_Q), dt);
+        }
+        app.scene.advance(rawDt);
+        app.camera.update(app.scene.selected < 0
+                              ? glm::vec3(0)
+                              : app.scene.position(app.scene.selected),
+                          dt);
         int fw, fh;
         glfwGetFramebufferSize(window, &fw, &fh);
         if (fw == 0 || fh == 0) {
+          ImGui::EndFrame();
           glfwWaitEventsTimeout(.1);
           continue;
         }
-        renderer.draw(scene, fw, fh);
+        renderer.draw(app.scene, app.camera, fw, fh);
+        int ww, wh;
+        glfwGetWindowSize(window, &ww, &wh);
+        app.ui.draw(app.scene, app.camera, ww, wh, fps);
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
+        ++frames;
+        if (now - stamp >= .5) {
+          fps = float(frames / (now - stamp));
+          frames = 0;
+          stamp = now;
+          std::string title =
+              "Solar System Explorer | " + std::to_string(int(fps)) + " FPS";
+          glfwSetWindowTitle(window, title.c_str());
+        }
       }
     }
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;

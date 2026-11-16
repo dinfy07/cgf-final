@@ -47,3 +47,10 @@ glm::mat4 Scene::model(int i) const {
                   glm::vec3(0, 1, 0));
   return glm::scale(m, glm::vec3(b.radius));
 }
+float Scene::focusDistance(int i) const {
+  return i < 0
+             ? 70.f
+             : (i == 8 ? 2.8f
+                       : (i == 5 ? 8.f
+                                 : std::max(3.5f, bodies.at(i).radius * 5.f)));
+}
